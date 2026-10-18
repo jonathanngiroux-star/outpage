@@ -1,6 +1,9 @@
 // app.js: the Outpage desktop frontend. Vanilla JS, no dependencies.
 // Every action calls a Go binding (window.go.main.desktopApp.*); errors
 // from bindings are shown in the view's error line — never swallowed.
+// esc() uses \u0026 escapes so the source never contains a decodable
+// entity (a past regression left it a no-op and operator text reached
+// the DOM raw).
 
 let App = null; // window.go.main.desktopApp once the runtime injects it
 
@@ -10,12 +13,22 @@ function setErr(id, msg) {
 }
 
 function pill(status) {
-  return `<span class="status-pill ${status}">${status}</span>`;
+  return `<span class="status-pill ${status}">${esc(status)}</span>`;
 }
 
+// esc escapes operator-supplied text for HTML interpolation. The
+// replacement strings are written with \u0026 so no HTML entity ever
+// appears in this source file (build/tooling decoded entities once and
+// silently disabled escaping — that class of regression is what the
+// frontend test guards).
 function esc(s) {
-  return String(s).replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">");
+  return String(s)
+    .replace(/&/g, "\u0026amp;")
+    .replace(/</g, "\u0026lt;")
+    .replace(/>/g, "\u0026gt;");
 }
+
+const LOADING = `<p class="empty">Loading\u2026</p>`;
 
 // ---- boot -----------------------------------------------------------
 
@@ -41,14 +54,21 @@ async function boot() {
   // Footer: donate addresses, always.
   const d = await App.DonateAddresses();
   document.getElementById("app-footer").innerHTML =
-    `Outpage is free, MIT-licensed software. Donations are the only funding — never a paywall, never counted as traction.<br>` +
-    `Ethereum / USDC (ERC-20): <code>${esc(d.ethereum)}</code> · Bitcoin: <code>${esc(d.bitcoin)}</code>`;
+    `Outpage is free, MIT-licensed software. Donations are the only funding \u2014 never a paywall, never counted as traction.<br>` +
+    `Ethereum / USDC (ERC-20): <code>${esc(d.ethereum)}</code> \u00b7 Bitcoin: <code>${esc(d.bitcoin)}</code>`;
   document.getElementById("donate-eth").textContent = d.ethereum;
   document.getElementById("donate-btc").textContent = d.bitcoin;
   document.getElementById("donate-note").textContent = d.note;
 
-  await refreshAll();
-  // First-run wizard: shows until the store says done.
+  // Loading states before the first answers arrive.
+  document.getElementById("comp-list").innerHTML = LOADING;
+  document.getElementById("inc-list").innerHTML = LOADING;
+  document.getElementById("sub-list").innerHTML = LOADING;
+
+  // The first-run wizard must show immediately — it is never gated
+  // behind data loads (a slow store must not blank the front door).
+  // List refreshes continue in the background.
+  refreshAll().catch(() => {});
   await maybeShowWizard();
 }
 
@@ -67,15 +87,16 @@ async function refreshAll() {
 // ---- components -----------------------------------------------------
 
 async function refreshComponents() {
-  const comps = await App.Components();
   const el = document.getElementById("comp-list");
+  el.innerHTML = LOADING;
+  const comps = await App.Components();
   if (!comps || comps.length === 0) {
     el.innerHTML = `<p class="empty">No components yet.</p>`;
     return;
   }
   el.innerHTML = `<table><tr><th>Name</th><th>Status</th><th>Description</th></tr>` +
     comps.map(c =>
-      `<tr><td>${esc(c.name)}</td><td>${pill(c.status)}</td><td class="muted">${esc(c.description || "—")}</td></tr>`
+      `<tr><td>${esc(c.name)}</td><td>${pill(c.status)}</td><td class="muted">${esc(c.description || "\u2014")}</td></tr>`
     ).join("") + `</table>`;
 }
 
@@ -94,23 +115,40 @@ async function createComponent() {
 
 // ---- incidents ------------------------------------------------------
 
+const UPDATE_STATUSES = ["investigating", "identified", "monitoring", "resolved"];
+
 async function refreshIncidents() {
-  const incs = await App.Incidents();
   const el = document.getElementById("inc-list");
+  el.innerHTML = LOADING;
+  const incs = await App.Incidents();
   if (!incs || incs.length === 0) {
     el.innerHTML = `<p class="empty">No incidents yet.</p>`;
     return;
   }
+  const rows = await Promise.all(incs.map(async inc => {
+    const ups = await App.IncidentUpdates(inc.id);
+    const comps = await App.IncidentComponentNames(inc.id);
+    const statusOptions = UPDATE_STATUSES.map(s =>
+      `<option${s === "monitoring" ? " selected" : ""}>${s}</option>`).join("");
+    return `<tr><td>${inc.id}</td><td class="muted">${esc(inc.kind)}</td><td>${esc(inc.name)}</td>` +
+      `<td>${pill(inc.status)}</td><td class="muted">${esc(inc.impact)}</td>` +
+      `<td><button class="ghost" onclick="toggleTimeline(${inc.id})">timeline (${ups.length})</button></td></tr>` +
+      `<tr class="timeline-row" id="timeline-${inc.id}" style="display:none">` +
+      `<td colspan="6">` +
+      (comps && comps.length ? `<p class="muted">Affected: ${esc(comps.join(", "))}</p>` : "") +
+      `<ol>${ups.map(u =>
+        `<li><b>${esc(u.status)}</b> \u2014 ${esc(u.body)}</li>`).join("")}</ol>` +
+      `<div class="row">` +
+      `<label for="inc-update-status-${inc.id}">Update status</label>` +
+      `<select id="inc-update-status-${inc.id}">${statusOptions}</select>` +
+      `<input id="inc-update-body-${inc.id}" placeholder="What changed?">` +
+      `<button class="primary" onclick="postUpdate(${inc.id})">Post update</button>` +
+      `<button class="ghost" onclick="postResolve(${inc.id})">Resolve</button>` +
+      `</div>` +
+      `</td></tr>`;
+  }));
   el.innerHTML = `<table><tr><th>#</th><th>Kind</th><th>Title</th><th>Status</th><th>Impact</th><th></th></tr>` +
-    (await Promise.all(incs.map(async inc => {
-      const ups = await App.IncidentUpdates(inc.id);
-      return `<tr><td>${inc.id}</td><td class="muted">${esc(inc.kind)}</td><td>${esc(inc.name)}</td>` +
-        `<td>${pill(inc.status)}</td><td class="muted">${esc(inc.impact)}</td>` +
-        `<td><button class="ghost" onclick="toggleTimeline(${inc.id})">timeline (${ups.length})</button></td></tr>` +
-        `<tr class="timeline-row" id="timeline-${inc.id}" style="display:none">` +
-        `<td colspan="6"><ol>${ups.map(u =>
-          `<li><b>${esc(u.status)}</b> — ${esc(u.body)}</li>`).join("")}</ol></td></tr>`;
-    }))).join("") + `</table>`;
+    rows.join("") + `</table>`;
 }
 
 function toggleTimeline(id) {
@@ -132,6 +170,38 @@ async function openIncident() {
   }
 }
 
+// postUpdate posts a timeline update from the incident's inline form.
+async function postUpdate(id) {
+  setErr("inc-error", "");
+  const status = document.getElementById("inc-update-status-" + id).value;
+  const body = document.getElementById("inc-update-body-" + id).value;
+  try {
+    await App.UpdateIncident(id, status, body);
+    document.getElementById("inc-update-body-" + id).value = "";
+    await refreshIncidents();
+    const row = document.getElementById("timeline-" + id);
+    if (row) row.style.display = "";
+    await renderPage();
+  } catch (e) {
+    setErr("inc-error", String(e));
+  }
+}
+
+// postResolve resolves the incident with the body text if given, else a
+// plain "Resolved."
+async function postResolve(id) {
+  setErr("inc-error", "");
+  const body = document.getElementById("inc-update-body-" + id).value || "Resolved.";
+  try {
+    await App.UpdateIncident(id, "resolved", body);
+    document.getElementById("inc-update-body-" + id).value = "";
+    await refreshIncidents();
+    await renderPage();
+  } catch (e) {
+    setErr("inc-error", String(e));
+  }
+}
+
 // ---- maintenance ------------------------------------------------------
 
 async function addMaintenance() {
@@ -142,9 +212,9 @@ async function addMaintenance() {
     await App.AddMaintenance(document.getElementById("maint-name").value, comps,
       document.getElementById("maint-start").value, document.getElementById("maint-end").value);
     document.getElementById("maint-name").value = "";
-    setErr("maint-error", "");
-    document.getElementById("maint-error").className = "ok-note";
-    document.getElementById("maint-error").textContent = "Maintenance scheduled.";
+    const el = document.getElementById("maint-error");
+    el.className = "ok-note";
+    el.textContent = "Maintenance scheduled.";
   } catch (e) {
     const el = document.getElementById("maint-error");
     el.className = "error";
@@ -155,11 +225,12 @@ async function addMaintenance() {
 // ---- subscribers ------------------------------------------------------
 
 async function refreshSubscribers() {
+  const el = document.getElementById("sub-list");
+  el.innerHTML = LOADING;
   const subs = await App.Subscribers();
   const e = document.getElementById("sub-count");
   const [emailCount, hookCount] = await App.SubscriberCounts();
   e.textContent = `email=${emailCount} webhook=${hookCount}`;
-  const el = document.getElementById("sub-list");
   if (!subs || subs.length === 0) {
     el.innerHTML = `<p class="empty">No subscribers yet.</p>`;
     return;
@@ -200,14 +271,14 @@ async function runMigrate() {
   try {
     const rep = await App.MigrateDryRun(document.getElementById("mig-input").value);
     document.getElementById("mig-summary").innerHTML =
-      `<p><b>${esc(rep.source)}</b> dry-run: <span class="ok-note">mapped=${rep.counts.mapped}</span> ` +
+      `<p><b>${esc(rep.source)}</b> dry-run: mapped=${rep.counts.mapped} ` +
       `partial=${rep.counts.partial} unmapped=${rep.counts.unmapped}</p>`;
     const details = (rep.mappings || []).map(m =>
       `<tr><td class="mono">${esc(m.key)}</td><td>${esc(m.source_id)}</td><td>${esc(m.name)}</td>` +
       `<td><b>${esc(m.result)}</b></td><td class="muted">${esc((m.dropped || []).join(", "))}</td>` +
       `<td class="muted">${esc(m.note || "")}</td></tr>`).join("");
     const risks = (rep.risks || []).map(r =>
-      `<li><span class="mono">${esc(r.key)}</span> — ${esc(r.note)}</li>`).join("");
+      `<li><span class="mono">${esc(r.key)}</span> \u2014 ${esc(r.note)}</li>`).join("");
     document.getElementById("mig-details").innerHTML =
       `<table><tr><th>Key</th><th>Source ID</th><th>Name</th><th>Result</th><th>Dropped</th><th>Note</th></tr>${details}</table>` +
       (risks ? `<p><b>Risks:</b></p><ul>${risks}</ul>` : `<p class="muted">No risks reported.</p>`);
@@ -226,11 +297,12 @@ function copyText(text, btn) {
 }
 
 async function renderPage() {
+  const frame = document.getElementById("page-frame");
   try {
     const html = await App.PublicPagePreview();
-    document.getElementById("page-frame").srcdoc = html;
+    frame.srcdoc = html;
   } catch (e) {
-    document.getElementById("page-frame").srcdoc = "<p class='error'>" + esc(String(e)) + "</p>";
+    frame.srcdoc = "<p class='error'>" + esc(String(e)) + "</p>";
   }
 }
 
@@ -243,8 +315,6 @@ async function maybeShowWizard() {
   // from Help at any time.
   const st = await App.WizardView();
   renderWizard(st);
-  // If the store is already done, hide the overlay (WizardView still
-  // returns welcome; the store flag decides).
   const done = await App.WizardDone();
   document.getElementById("wizard-overlay").classList.toggle("hidden", done);
 }
@@ -258,7 +328,7 @@ async function reopenWizard() {
 function renderWizard(st) {
   wizardState = st;
   document.getElementById("wizard-progress").textContent =
-    `Setup wizard — step ${st.step.id === "welcome" ? 1 : stepIndex(st)} — Help reopens this any time`;
+    `Setup wizard \u2014 ${stepIndex(st)} of 7 \u2014 Help reopens this any time`;
   document.getElementById("wizard-title").textContent = st.step.title;
   document.getElementById("wizard-body").textContent = st.step.body;
   // fields
@@ -294,7 +364,7 @@ function renderWizard(st) {
 function stepIndex(st) {
   const ids = ["welcome", "page", "component", "incident", "subscriber", "migrate", "donate"];
   const i = ids.indexOf(st.step.id);
-  return i < 0 ? 1 : i + 1;
+  return (i < 0 ? 1 : i + 1) + "/7";
 }
 
 async function wizardNext() {
@@ -334,12 +404,37 @@ async function wizardBack() {
   }
 }
 
-// Keyboard path: Enter in a wizard input = Next; Esc closes nothing (the
-// wizard is the front door on first run).
+// Keyboard path for primary actions: Enter in a wizard input = Next;
+// Enter in a main-view input submits that view's form. The wizard
+// overlay owns the keyboard while it is open.
 document.addEventListener("keydown", e => {
-  if (e.key === "Enter" && !document.getElementById("wizard-overlay").classList.contains("hidden")) {
+  if (e.key !== "Enter") return;
+  const id = e.target && e.target.id ? e.target.id : "";
+  if (id.startsWith("wiz-")) {
     wizardNext();
+    return;
   }
+  if (!document.getElementById("wizard-overlay").classList.contains("hidden")) {
+    return; // wizard open: main-view fields are not reachable
+  }
+  const submits = {
+    "comp-name": createComponent,
+    "comp-desc": createComponent,
+    "inc-name": openIncident,
+    "inc-components": openIncident,
+    "maint-name": addMaintenance,
+    "maint-start": addMaintenance,
+    "maint-end": addMaintenance,
+    "sub-address": addSubscriber,
+    "sub-secret": addSubscriber,
+    "inc-update-body-1": null, // dynamic ids handled below
+  };
+  delete submits["inc-update-body-1"];
+  if (id.startsWith("inc-update-body-")) {
+    postUpdate(id.slice("inc-update-body-".length));
+    return;
+  }
+  if (submits[id]) submits[id]();
 });
 
 boot();

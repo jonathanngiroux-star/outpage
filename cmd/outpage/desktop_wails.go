@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"strings"
 	"time"
 
 	"github.com/wailsapp/wails/v2"
@@ -26,8 +27,52 @@ import (
 	"github.com/jonathanngiroux-star/outpage/internal/store"
 )
 
+// frontendEmbed holds the GUI assets. The test/ directory is excluded:
+// it ships in the repo, not in the binary.
+//
 //go:embed all:frontend
 var frontendEmbed embed.FS
+
+// frontendAssets serves the embedded frontend at /, minus tests.
+func frontendAssets() fs.FS {
+	sub, err := fs.Sub(frontendEmbed, "frontend")
+	if err != nil {
+		panic("desktop: embedded frontend missing: " + err.Error())
+	}
+	rd, ok := sub.(fs.ReadDirFS)
+	if !ok {
+		panic("desktop: embedded frontend is not a ReadDirFS")
+	}
+	return &noTestFS{rd}
+}
+
+// noTestFS hides the test/ subdirectory from the embedded asset server.
+type noTestFS struct{ inner fs.ReadDirFS }
+
+func (n *noTestFS) Open(name string) (fs.File, error) {
+	if strings.HasPrefix(name, "test/") || strings.Contains(name, "/test/") {
+		return nil, fs.ErrNotExist
+	}
+	return n.inner.Open(name)
+}
+
+// ReadDir hides test entries at the root listing too.
+func (n *noTestFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	if name == "." {
+		entries, err := n.inner.ReadDir(name)
+		if err != nil {
+			return nil, err
+		}
+		var out []fs.DirEntry
+		for _, e := range entries {
+			if e.Name() != "test" {
+				out = append(out, e)
+			}
+		}
+		return out, nil
+	}
+	return n.inner.ReadDir(name)
+}
 
 // desktopApp is the struct bound to the frontend.
 type desktopApp struct {
@@ -382,10 +427,4 @@ func runDesktopWails(st *store.Store, stdout, stderr io.Writer) int {
 }
 
 // frontendAssets serves the embedded frontend at /.
-func frontendAssets() fs.FS {
-	sub, err := fs.Sub(frontendEmbed, "frontend")
-	if err != nil {
-		panic("desktop: embedded frontend missing: " + err.Error())
-	}
-	return sub
-}
+// (defined above frontendEmbed — the noTestFS wrapper hides test/)

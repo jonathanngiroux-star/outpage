@@ -31,6 +31,12 @@ jobs:
         run: CGO_ENABLED=1 go build -tags desktop,production,webkit2_41 -o /tmp/outpage-desktop ./cmd/outpage
       - name: GUI binding tests (desktop tag)
         run: CGO_ENABLED=1 go test -tags desktop ./cmd/outpage/ -count=1
+      # Frontend test: the real app.js driven against a mock binding layer
+      # (zero npm dependencies — plain node).
+      - name: frontend test (app.js against the binding contract)
+        run: |
+          node --check cmd/outpage/frontend/app.js
+          node cmd/outpage/frontend/test/app.test.mjs
       # Donation rule gate: both addresses byte-for-byte, exactly once each.
       - name: donate gate
         run: |
