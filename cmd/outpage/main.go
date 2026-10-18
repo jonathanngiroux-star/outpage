@@ -70,6 +70,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 0
 	case "serve":
 		return cmdServe(rest, stdout, stderr)
+	case "desktop":
+		return launchDesktop(rest, stdout, stderr)
 	case "component":
 		return cmdComponent(rest, stdout, stderr)
 	case "incident":

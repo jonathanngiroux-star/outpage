@@ -85,6 +85,25 @@ docker build -t outpage .
 docker run -d -p 8080:8080 -v outpage-data:/data outpage
 ```
 
+## Desktop GUI (Wails v2)
+
+The desktop app is the same binary compiled with the webview backend:
+
+```bash
+CGO_ENABLED=1 go build -tags desktop,production,webkit2_41 \
+  -o outpage-desktop ./cmd/outpage
+./outpage-desktop desktop
+```
+
+It covers every wedge action — component editor, incident composer with
+timelines, maintenance scheduler, subscriber list (addresses masked),
+Statuspage dry-run viewer, public-page preview, and the donate view.
+First launch opens a step-by-step setup wizard that creates your page
+name, first component, and first incident with your values; **Help**
+reopens it any time. The default cgo-free build explains how to build
+the GUI instead of crashing. Full setup — dependencies, tags, `wails
+dev` hot reload: **[docs/gui-setup.md](docs/gui-setup.md)**.
+
 ## Status
 
 Working today, covered by tests:
@@ -99,11 +118,12 @@ Working today, covered by tests:
 - `serve` public page + `/donate`; `page render` for static hosting
 - `migrate --from=statuspage --dry-run` (+ `--format=json`) with a
   machine-stable report contract
+- Desktop GUI (Wails v2, `-tags desktop,production,webkit2_41`): all
+  wedge actions, first-run wizard, masked subscriber list, donate view
 
 Planned (in progress, not yet shipped):
 
-- Wails v2 desktop GUI (`outpage desktop`) — first-run wizard included
-- Terminal UI (`outpage tui`)
+- Terminal UI (`outpage tui`) — same wizard, same store
 - Statuspage import beyond the dry-run report
 
 **Deliberately not built** (scope locks, see [AGENTS.md](AGENTS.md)):
