@@ -1,0 +1,108 @@
+{
+  "page": {
+    "id": "pg9k2xw4tq",
+    "name": "Example Cloud",
+    "url": "status.example.net",
+    "created_at": "2026-01-15T09:00:00Z"
+  },
+  "components": [
+    {
+      "id": "c1a2b3",
+      "name": "API",
+      "description": "Public REST API",
+      "status": "operational",
+      "only_show_if_degraded": false
+    },
+    {
+      "id": "c4d5e6",
+      "name": "Web App",
+      "description": "Customer dashboard",
+      "status": "degraded_performance",
+      "only_show_if_degraded": false
+    },
+    {
+      "id": "c7f8a9",
+      "name": "Edge Cache",
+      "description": "Legacy CDN edge with custom fields",
+      "status": "partial_outage",
+      "only_show_if_degraded": true,
+      "custom_fields": {"region": "us-east-1"}
+    }
+  ],
+  "incidents": [
+    {
+      "id": "i10z1",
+      "name": "Elevated API error rates",
+      "status": "resolved",
+      "impact": "minor",
+      "components": ["c1a2b3"],
+      "created_at": "2026-08-02T14:03:00Z",
+      "resolved_at": "2026-08-02T16:40:00Z",
+      "updates": [
+        {
+          "status": "investigating",
+          "body": "We are investigating elevated 5xx rates on the API.",
+          "created_at": "2026-08-02T14:03:00Z"
+        },
+        {
+          "status": "identified",
+          "body": "A bad deploy rolled out to two API nodes; rolling back.",
+          "created_at": "2026-08-02T15:10:00Z"
+        },
+        {
+          "status": "resolved",
+          "body": "Rollback complete; error rates back to baseline.",
+          "created_at": "2026-08-02T16:40:00Z"
+        }
+      ]
+    },
+    {
+      "id": "i11y2",
+      "name": "Dashboard login failures",
+      "status": "monitoring",
+      "impact": "major",
+      "components": ["c4d5e6"],
+      "created_at": "2026-09-28T08:15:00Z",
+      "updates": [
+        {
+          "status": "investigating",
+          "body": "Some users cannot sign in to the dashboard.",
+          "html_body": "<p>Some users <strong>cannot</strong> sign in.</p>",
+          "created_at": "2026-09-28T08:15:00Z"
+        },
+        {
+          "status": "monitoring",
+          "body": "Session store failed over; watching error rates.",
+          "created_at": "2026-09-28T09:02:00Z"
+        }
+      ]
+    }
+  ],
+  "scheduled_maintenances": [
+    {
+      "id": "m3n4o5",
+      "name": "Database upgrade",
+      "status": "scheduled",
+      "impact": "maintenance",
+      "components": ["c1a2b3"],
+      "starts_at": "2026-10-25T01:00:00Z",
+      "ends_at": "2026-10-25T03:00:00Z",
+      "updates": [
+        {
+          "status": "scheduled",
+          "body": "Planned database major-version upgrade.",
+          "created_at": "2026-10-01T12:00:00Z"
+        }
+      ]
+    }
+  ],
+  "subscribers": [
+    {"id": "s01", "type": "email", "address": "ops1@example.net"},
+    {"id": "s02", "type": "email", "address": "ops2@example.net"},
+    {"id": "s03", "type": "webhook", "address": "https://hooks.example.net/outpage"},
+    {"id": "s04", "type": "sms", "address": "+15550000000"}
+  ],
+  "metrics_data": [
+    {"metric_id": "mtr_api", "name": "API uptime", "points": 720}
+  ]
+}

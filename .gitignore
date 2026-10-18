@@ -1,0 +1,12 @@
+/outpage
+/outpage-desktop*
+*.db
+*.db-wal
+*.db-shm
+/dist/
+/frontend/node_modules/
+__pycache__/
+
+# internal planning briefs — never ship
+/IDEA.md
+/[0-9][0-9]-*.md

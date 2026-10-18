@@ -1,0 +1,56 @@
+name: ci
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27"
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - name: vet
+        run: go vet ./...
+      - name: test (race on the concurrent packages)
+        run: go test -race ./internal/store/ ./internal/serve/ ./internal/subscribers/
+      - name: test (all)
+        run: go test ./...
+      - name: build
+        run: go build -o outpage ./cmd/outpage
+      # Donation rule gate: both addresses byte-for-byte, exactly once each.
+      - name: donate gate
+        run: |
+          OUT=$(./outpage donate)
+          echo "$OUT" | grep -Fx "Ethereum / USDC (ERC-20): 0x85ee7E71f762d772599cbF1EC20E651B30657521"
+          echo "$OUT" | grep -Fx "Bitcoin: bc1qxe2zx5tv3hdreaej6s2x4p7han85uey828rrhg"
+          test $(echo "$OUT" | grep -c "0x85ee7E71f762d772599cbF1EC20E651B30657521") -eq 1
+          test $(echo "$OUT" | grep -c "bc1qxe2zx5tv3hdreaej6s2x4p7han85uey828rrhg") -eq 1
+      # Fidelity gate: the migrate dry-run on the committed fixture must stay
+      # machine-stable — same input, same classification counts and keys.
+      - name: migrate fixture gate (statuspage)
+        run: |
+          ./outpage migrate --from=statuspage --dry-run --format=json \
+            --input testdata/fixtures/statuspage/sample-export.json > /tmp/report.json
+          jq -e '.source=="statuspage" and .dry_run==true
+                 and .counts.mapped==7 and .counts.partial==3 and .counts.unmapped==2
+                 and (.mappings | map(select(.result=="unmapped") | .key)) == ["subscriber.sms","metrics.uptime"]
+                 and ((.risks | map(.key)) | index("webhook.secrets")) != null' /tmp/report.json
+      # serve must boot and publish the seeded component + donate page.
+      - name: serve smoke (boot + page + donate + shutdown)
+        run: |
+          rm -f /tmp/ci.db*
+          ./outpage component add --db /tmp/ci.db --name "API" > /dev/null
+          ./outpage serve --db /tmp/ci.db --http 127.0.0.1:18080 &
+          SRV=$!
+          for i in $(seq 1 15); do curl -sf http://127.0.0.1:18080/ >/dev/null && break; sleep 1; done
+          curl -sf http://127.0.0.1:18080/ | grep -q "API"
+          curl -sf http://127.0.0.1:18080/ | grep -q "0x85ee7E71f762d772599cbF1EC20E651B30657521"
+          curl -sf http://127.0.0.1:18080/donate | grep -q "bc1qxe2zx5tv3hdreaej6s2x4p7han85uey828rrhg"
+          kill $SRV
+          rm -f /tmp/ci.db*
+      - name: docker build
+        run: docker build -t outpage-ci .
