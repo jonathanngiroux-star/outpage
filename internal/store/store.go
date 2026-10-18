@@ -296,6 +296,10 @@ func (s *Store) OpenIncident(name string, impact string, componentNames []string
 		return Incident{}, err
 	}
 	for _, cn := range componentNames {
+		cn = strings.TrimSpace(cn)
+		if cn == "" {
+			continue
+		}
 		var cid int64
 		if err := tx.QueryRow(`SELECT id FROM components WHERE name=? COLLATE NOCASE`, cn).Scan(&cid); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -303,7 +307,7 @@ func (s *Store) OpenIncident(name string, impact string, componentNames []string
 			}
 			return Incident{}, err
 		}
-		if _, err := tx.Exec(`INSERT INTO incident_components(incident_id, component_id) VALUES(?,?)`,
+		if _, err := tx.Exec(`INSERT OR IGNORE INTO incident_components(incident_id, component_id) VALUES(?,?)`,
 			inc.ID, cid); err != nil {
 			return Incident{}, err
 		}
@@ -352,6 +356,10 @@ func (s *Store) OpenMaintenance(name string, componentNames []string, starts, en
 		return Incident{}, err
 	}
 	for _, cn := range componentNames {
+		cn = strings.TrimSpace(cn)
+		if cn == "" {
+			continue
+		}
 		var cid int64
 		if err := tx.QueryRow(`SELECT id FROM components WHERE name=? COLLATE NOCASE`, cn).Scan(&cid); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -359,7 +367,7 @@ func (s *Store) OpenMaintenance(name string, componentNames []string, starts, en
 			}
 			return Incident{}, err
 		}
-		if _, err := tx.Exec(`INSERT INTO incident_components(incident_id, component_id) VALUES(?,?)`,
+		if _, err := tx.Exec(`INSERT OR IGNORE INTO incident_components(incident_id, component_id) VALUES(?,?)`,
 			inc.ID, cid); err != nil {
 			return Incident{}, err
 		}

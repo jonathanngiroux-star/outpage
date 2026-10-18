@@ -23,6 +23,9 @@ func TestNoBillingSurface(t *testing.T) {
 		"docs/pricing.md": true, // the "no pricing" stub
 		"AGENTS.md":       true, // agent-facing enforcement notes
 		"GOVERNANCE.md":   true, // policy names the banned concepts to ban them
+		// the audit note documents the billing walk itself (quotes banned
+		// words to describe the gate) — skip it, same as the skill ref
+		"docs/audit/backend.md": true,
 		// the donate-exact test owns the banned vocabulary (it asserts its
 		// absence) — skip only the file that tests the negation rule
 		"internal/donate/donate_test.go": true,

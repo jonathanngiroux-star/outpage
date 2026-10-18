@@ -1,0 +1,108 @@
+{
+  "source": "statuspage",
+  "dry_run": true,
+  "counts": {
+    "mapped": 7,
+    "partial": 3,
+    "unmapped": 2
+  },
+  "mappings": [
+    {
+      "key": "page",
+      "source_id": "pg9k2xw4tq",
+      "name": "Example Cloud",
+      "result": "partial",
+      "dropped": [
+        "page.id",
+        "page.url",
+        "page.created_at"
+      ],
+      "note": "page title imports; identity fields drop (custom domain is your reverse proxy)"
+    },
+    {
+      "key": "component",
+      "source_id": "c1a2b3",
+      "name": "API",
+      "result": "mapped"
+    },
+    {
+      "key": "component",
+      "source_id": "c4d5e6",
+      "name": "Web App",
+      "result": "mapped"
+    },
+    {
+      "key": "component",
+      "source_id": "c7f8a9",
+      "name": "Edge Cache",
+      "result": "partial",
+      "dropped": [
+        "only_show_if_degraded",
+        "custom_fields"
+      ]
+    },
+    {
+      "key": "incident",
+      "source_id": "i10z1",
+      "name": "Elevated API error rates",
+      "result": "mapped"
+    },
+    {
+      "key": "incident",
+      "source_id": "i11y2",
+      "name": "Dashboard login failures",
+      "result": "partial",
+      "dropped": [
+        "updates.html_body"
+      ]
+    },
+    {
+      "key": "maintenance",
+      "source_id": "m3n4o5",
+      "name": "Database upgrade",
+      "result": "mapped"
+    },
+    {
+      "key": "subscriber.email",
+      "source_id": "s01",
+      "name": "ops1@example.net",
+      "result": "mapped"
+    },
+    {
+      "key": "subscriber.email",
+      "source_id": "s02",
+      "name": "ops2@example.net",
+      "result": "mapped"
+    },
+    {
+      "key": "subscriber.webhook",
+      "source_id": "s03",
+      "name": "https://hooks.example.net/outpage",
+      "result": "mapped"
+    },
+    {
+      "key": "subscriber.sms",
+      "source_id": "s04",
+      "name": "+15550000000",
+      "result": "unmapped",
+      "note": "no SMS gateway, by scope lock"
+    },
+    {
+      "key": "metrics.uptime",
+      "source_id": "mtr_api",
+      "name": "API uptime",
+      "result": "unmapped",
+      "note": "Outpage is a status page, not a monitor"
+    }
+  ],
+  "risks": [
+    {
+      "key": "webhook.secrets",
+      "note": "signing secrets do not exist in the export; re-enter per webhook subscriber after import"
+    },
+    {
+      "key": "subscriber.reconfirm",
+      "note": "re-confirm imported email addresses before first send (anti-spam hygiene)"
+    }
+  ]
+}

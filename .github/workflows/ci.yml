@@ -39,6 +39,13 @@ jobs:
                  and .counts.mapped==7 and .counts.partial==3 and .counts.unmapped==2
                  and (.mappings | map(select(.result=="unmapped") | .key)) == ["subscriber.sms","metrics.uptime"]
                  and ((.risks | map(.key)) | index("webhook.secrets")) != null' /tmp/report.json
+      # Golden drift gate: the committed report must equal a fresh run.
+      - name: migrate golden gate (drift)
+        run: |
+          go run ./cmd/gentestdata testdata/fixtures/statuspage/sample-export.json > /tmp/golden-now.json
+          diff -u testdata/golden/statuspage-report.json /tmp/golden-now.json \
+            && echo "golden current" \
+            || (echo "::error::golden report is stale — regenerate via go run ./cmd/gentestdata" && exit 1)
       # serve must boot and publish the seeded component + donate page.
       - name: serve smoke (boot + page + donate + shutdown)
         run: |
