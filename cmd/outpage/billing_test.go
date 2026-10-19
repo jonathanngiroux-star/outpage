@@ -23,9 +23,12 @@ func TestNoBillingSurface(t *testing.T) {
 		"docs/pricing.md": true, // the "no pricing" stub
 		"AGENTS.md":       true, // agent-facing enforcement notes
 		"GOVERNANCE.md":   true, // policy names the banned concepts to ban them
-		// the audit note documents the billing walk itself (quotes banned
-		// words to describe the gate) — skip it, same as the skill ref
+		// audit notes document the walks themselves (quote banned words
+		// to describe the gates) — skip them
 		"docs/audit/backend.md": true,
+		"docs/audit/tui.md":     true,
+		"docs/audit/gui.md":     true,
+		"docs/audit/system.md":  true,
 		// the donate-exact test owns the banned vocabulary (it asserts its
 		// absence) — skip only the file that tests the negation rule
 		"internal/donate/donate_test.go": true,
@@ -89,7 +92,12 @@ func TestNoBillingSurface(t *testing.T) {
 }
 
 // containsNegation reports whether every occurrence of w in s has a
-// negation word within ~40 chars before it (case-insensitive).
+// negation word within ~80 chars before it (case-insensitive). The
+// window is a gate tuning knob: legitimate product copy like
+// "Deliberately not built (scope locks, see AGENTS.md): on-call/
+// escalations" places the negation ~61 chars before the banned word —
+// when a genuine negation is missed, widen the window, never rewrite
+// honest copy.
 func containsNegation(s, w string) bool {
 	lower := strings.ToLower(s)
 	target := strings.ToLower(w)
@@ -98,16 +106,41 @@ func containsNegation(s, w string) bool {
 		if i < 0 {
 			return true
 		}
-		start := i - 40
+		start := i - 80
 		if start < 0 {
 			start = 0
 		}
-		window := lower[start:i]
-		if !strings.Contains(window, "no ") && !strings.Contains(window, "not ") &&
-			!strings.Contains(window, "never ") && !strings.Contains(window, "without ") &&
-			!strings.Contains(window, "isn't ") && !strings.Contains(window, "none ") {
+		if !hasNegationWord(lower[start:i]) {
 			return false
 		}
 		lower = lower[i+len(target):]
 	}
+}
+
+// hasNegationWord reports whether the window contains a negation word —
+// no / not / never / without / isn't / none — as a whole word (followed
+// by a non-letter), so markdown emphasis like "is not** an" still
+// counts as the negation it is.
+func hasNegationWord(window string) bool {
+	words := []string{"no", "not", "never", "without", "isn't", "none", "nor"}
+	for _, w := range words {
+		from := 0
+		for {
+			j := strings.Index(window[from:], w)
+			if j < 0 {
+				break
+			}
+			j += from
+			after := j + len(w)
+			if after >= len(window) || !isASCIILetter(window[after]) {
+				return true
+			}
+			from = after
+		}
+	}
+	return false
+}
+
+func isASCIILetter(b byte) bool {
+	return b >= 'a' && b <= 'z'
 }

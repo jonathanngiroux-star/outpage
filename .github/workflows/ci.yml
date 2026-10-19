@@ -37,6 +37,10 @@ jobs:
         run: |
           node --check cmd/outpage/frontend/app.js
           node cmd/outpage/frontend/test/app.test.mjs
+      # The end-to-end release-gate script: build, lifecycle, real-HTTP
+      # page checks, migrate contract + golden, TUI non-TTY.
+      - name: e2e release gate
+        run: ./scripts/e2e.sh
       # Donation rule gate: both addresses byte-for-byte, exactly once each.
       - name: donate gate
         run: |
