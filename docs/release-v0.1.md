@@ -47,7 +47,7 @@ no subscription, no gated features, ever.
 ## Quality gates (all green at tag time)
 
 - `gofmt` / `go vet` clean (default and desktop builds)
-- `go test ./...` — 9 packages, including race on the store/serve/
+- `go test ./...` — 8 packages, including race on the store/serve/
   subscribers/cmd paths
 - Desktop binding tests (`-tags desktop`) and the 15-case frontend
   suite (real `app.js` against the binding contract)
