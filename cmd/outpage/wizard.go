@@ -10,6 +10,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/jonathanngiroux-star/outpage/internal/donate"
 	"github.com/jonathanngiroux-star/outpage/internal/migrate/statuspage"
@@ -149,17 +151,31 @@ func (w *wizard) view() wizardView {
 	return v
 }
 
-// migratePreview runs the real dry-run on the committed fixture and
-// formats the one-line summary the step shows.
+// migratePreviewCached memoizes the fixture report per process: the TUI
+// renders on every keypress and the wizard re-views the migrate step;
+// a file read + JSON parse per frame is a stutter bug.
+var (
+	migrateParseCalls int32
+	migrateOnce       sync.Once
+	migrateCache      string
+)
+
+// migratePreview returns the one-line dry-run summary (cached; parsed
+// once per process — the TUI renders on every keypress).
 func migratePreview() string {
-	root := repoRootString()
-	exp, err := statuspage.Parse(root + "/testdata/fixtures/statuspage/sample-export.json")
-	if err != nil {
-		return "migrate preview unavailable: " + err.Error()
-	}
-	rep := statuspage.Analyze(exp)
-	return fmt.Sprintf("Sample Statuspage export: mapped=%d partial=%d unmapped=%d — see the Migrate view for the full report.",
-		rep.Counts.Mapped, rep.Counts.Partial, rep.Counts.Unmapped)
+	migrateOnce.Do(func() {
+		atomic.AddInt32(&migrateParseCalls, 1)
+		root := repoRootString()
+		exp, err := statuspage.Parse(root + "/testdata/fixtures/statuspage/sample-export.json")
+		if err != nil {
+			migrateCache = "migrate preview unavailable: " + err.Error()
+			return
+		}
+		rep := statuspage.Analyze(exp)
+		migrateCache = fmt.Sprintf("Sample Statuspage export: mapped=%d partial=%d unmapped=%d — see the Migrate view for the full report.",
+			rep.Counts.Mapped, rep.Counts.Partial, rep.Counts.Unmapped)
+	})
+	return migrateCache
 }
 
 // next validates and applies the step, then advances. Errors name the

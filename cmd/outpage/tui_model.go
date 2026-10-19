@@ -70,6 +70,19 @@ func keyMsg(k string) string { return k }
 // typeText appends typed runes to the input line.
 func typeText(s string) string { return s }
 
+// quitOnKey decides whether a keypress quits the program: 'q' quits only
+// on an empty input line (typing "Queue" must work); ctrl+c always
+// quits. The adapter owns the decision; the model stays pure.
+func quitOnKey(input, key string) bool {
+	switch key {
+	case "ctrl+c":
+		return true
+	case "q":
+		return input == ""
+	}
+	return false
+}
+
 // update advances the model with one key event (or typed text).
 func (m Model) update(input string) Model {
 	switch input {
@@ -90,8 +103,6 @@ func (m Model) update(input string) Model {
 			m.status = ""
 		}
 		return m
-	case "q", "ctrl+c":
-		return m // the adapter handles quitting
 	}
 
 	if m.inWizard {
@@ -114,9 +125,19 @@ func (m Model) update(input string) Model {
 }
 
 // updateWizard routes a key while the wizard is open. Field values are
-// typed into the input line; enter applies the current step's fields,
-// 'b' goes back, 's' skips optional steps.
+// typed into the input line; enter applies the current step's fields.
+// 'b' (back) and 's' (skip) act only on an EMPTY input line — with text
+// being typed they are characters, so names like "Status" or "Bob" are
+// typeable.
 func (m *Model) updateWizard(input string) {
+	if input == "b" && m.input != "" {
+		m.input += input
+		return
+	}
+	if input == "s" && m.input != "" {
+		m.input += input
+		return
+	}
 	switch input {
 	case "b":
 		m.wiz.back()
@@ -313,7 +334,7 @@ func (m Model) view() string {
 	if m.status != "" {
 		fmt.Fprintf(&b, "\n  %s\n", m.status)
 	}
-	fmt.Fprintf(&b, "\n  [tab/shift+tab] screens  [enter] submit  [?] wizard  [q] quit\n")
+	fmt.Fprintf(&b, "\n  [tab/shift+tab] screens  [enter] submit  [?] wizard  [q] quit (empty line)\n")
 	return b.String()
 }
 

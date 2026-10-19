@@ -111,8 +111,10 @@ in the terminal: components, incidents, subscriber counts (addresses
 never render), the migrate summary, and the donate screen — same SQLite
 file as the GUI and CLI. First launch runs the same setup wizard; `?`
 reopens it. Keys are shown on every screen: `tab`/`shift+tab` switch
-screens, `enter` submits the input line, `b`/`s` are wizard back/skip,
-`q` quits. Non-TTY contexts print a hint instead of hanging.
+screens, `enter` submits the input line, `b`/`s` are wizard back/skip
+(on an empty line — they type normally otherwise), `q` quits from an
+empty line, ctrl+c always quits. Non-TTY contexts print a hint instead
+of hanging.
 
 ## Status
 

@@ -2,7 +2,8 @@ package main
 
 // tui_tea.go: the Bubble Tea adapter. All logic lives in Model
 // (tui_model.go); this file is terminal plumbing only — key events are
-// normalized to the same tokens the tests use.
+// normalized to the same tokens the tests use. The quit decision uses
+// quitOnKey: 'q' quits only on an empty input line, ctrl+c always.
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
@@ -32,9 +33,10 @@ func (t teaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t.width, t.height = m.Width, m.Height
 		return t, nil
 	case tea.KeyMsg:
-		switch m.String() {
-		case "ctrl+c":
+		if quitOnKey(t.input, m.String()) {
 			return t, tea.Quit
+		}
+		switch m.String() {
 		case "enter":
 			return t.updated("enter"), nil
 		case "tab":
@@ -45,10 +47,6 @@ func (t teaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return t.updated("backspace"), nil
 		case "?":
 			return t.updated("?"), nil
-		case "b":
-			return t.updated("b"), nil
-		case "s":
-			return t.updated("s"), nil
 		default:
 			if len(m.Runes) > 0 {
 				return t.updated(string(m.Runes)), nil
