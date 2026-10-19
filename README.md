@@ -145,13 +145,28 @@ kind, and any hosted/multi-tenant tier.
 
 ## Install
 
-Build from source (Go 1.27+):
+Download the release binary for your platform (all assets carry a
+SHA-256 in `checksums.txt`):
+
+```bash
+curl -fsSL -o outpage https://github.com/jonathanngiroux-star/outpage/releases/download/v0.1/outpage-linux-amd64
+chmod +x outpage
+./outpage component add --name "API"
+./outpage serve        # http://127.0.0.1:8080/
+```
+
+CLI + TUI binaries ship for Linux/macOS/Windows on amd64 and arm64
+(cgo-free). The desktop GUI ships as `outpage-desktop-linux-amd64`
+(needs `webkit2gtk-4.1` at runtime); on other platforms build it from
+source with the tags above.
+
+Or build from source (Go 1.27+):
 
 ```bash
 go build -o outpage ./cmd/outpage
 ```
 
-or use the Dockerfile. Prebuilt release binaries ship with v0.1.
+Or use the Dockerfile.
 
 ## Donations
 
