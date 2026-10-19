@@ -104,6 +104,16 @@ reopens it any time. The default cgo-free build explains how to build
 the GUI instead of crashing. Full setup — dependencies, tags, `wails
 dev` hot reload: **[docs/gui-setup.md](docs/gui-setup.md)**.
 
+## Terminal UI
+
+`outpage tui` (or bare `outpage` in a terminal) opens the same workflows
+in the terminal: components, incidents, subscriber counts (addresses
+never render), the migrate summary, and the donate screen — same SQLite
+file as the GUI and CLI. First launch runs the same setup wizard; `?`
+reopens it. Keys are shown on every screen: `tab`/`shift+tab` switch
+screens, `enter` submits the input line, `b`/`s` are wizard back/skip,
+`q` quits. Non-TTY contexts print a hint instead of hanging.
+
 ## Status
 
 Working today, covered by tests:
@@ -120,10 +130,11 @@ Working today, covered by tests:
   machine-stable report contract
 - Desktop GUI (Wails v2, `-tags desktop,production,webkit2_41`): all
   wedge actions, first-run wizard, masked subscriber list, donate view
+- Terminal UI (`outpage tui`, bare `outpage`): same wizard, same store,
+  keyboard-only, no blocking network on launch
 
 Planned (in progress, not yet shipped):
 
-- Terminal UI (`outpage tui`) — same wizard, same store
 - Statuspage import beyond the dry-run report
 
 **Deliberately not built** (scope locks, see [AGENTS.md](AGENTS.md)):

@@ -7,6 +7,7 @@ package main
 // draw fields and results.
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -183,6 +184,22 @@ func (w *wizard) next(vals map[string]string) error {
 			return fmt.Errorf("component_name: a component name is required")
 		}
 		if _, err := w.st.AddComponent(name, strings.TrimSpace(vals["component_description"])); err != nil {
+			// Going Back then re-submitting the same value is the edit
+			// path, not an error: if the component already exists with
+			// this name, treat the step as satisfied. A genuinely new
+			// duplicate (different description) still surfaces.
+			if errors.Is(err, store.ErrDuplicate) {
+				existing := false
+				for _, c := range w.st.ListComponents() {
+					if strings.EqualFold(c.Name, name) {
+						existing = true
+						break
+					}
+				}
+				if existing {
+					break // step satisfied; advance
+				}
+			}
 			return fmt.Errorf("component_name: %w", err)
 		}
 	case "incident":

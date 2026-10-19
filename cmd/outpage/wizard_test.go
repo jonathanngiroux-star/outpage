@@ -152,11 +152,16 @@ func TestWizardBack(t *testing.T) {
 	if w.values["component_name"] != "API" {
 		t.Fatalf("values lost on back: %+v", w.values)
 	}
-	// Re-applying with a new name updates the value store; the component
-	// already exists, so a duplicate surfaces as a step error (user edits).
-	if err := w.next(map[string]string{"component_name": "API"}); err == nil {
-		t.Fatal("duplicate component on re-apply must surface")
+	// Re-applying the SAME name after Back is the edit path — the step is
+	// satisfied (the component exists), not a duplicate error.
+	if err := w.next(map[string]string{"component_name": "API"}); err != nil {
+		t.Fatalf("re-apply same component after back must succeed: %v", err)
 	}
+	if got := w.current().ID; got != "incident" {
+		t.Fatalf("re-apply must advance to incident, got %q", got)
+	}
+	// Back again and apply a NEW name: creates a second component.
+	w.back()
 	drive(t, w, map[string]string{"component_name": "Web"})
 	if got := len(s.ListComponents()); got != 2 {
 		t.Fatalf("components after back+edit = %d, want 2", got)

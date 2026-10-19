@@ -57,11 +57,14 @@ Run 'outpage <command> -h' for flags. Docs: docs/ (README for the tour).`)
 // run dispatches. Returns process exit code.
 func run(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		usage(stderr)
-		return 2
+		// Bare `outpage` in a terminal opens the TUI — the operator's
+		// front door. Non-TTY contexts print a hint and exit.
+		return launchTUI(args, stdout, stderr)
 	}
 	cmd, rest := args[0], args[1:]
 	switch cmd {
+	case "tui":
+		return launchTUI(rest, stdout, stderr)
 	case "version":
 		fmt.Fprintln(stdout, "outpage "+version)
 		return 0
