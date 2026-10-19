@@ -9,9 +9,12 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /outpage ./cmd/outpage
 FROM scratch
 COPY --from=build /outpage /outpage
 # SQLite file lives on a mounted volume; scratch has no shell or TLS roots.
-# Bind to loopback behind your reverse proxy (docs/custom-domain.md).
 VOLUME ["/data"]
-ENV OUTPAGE_DB=/data/outpage.db OUTPAGE_HTTP=127.0.0.1:8080
+# Bind all interfaces INSIDE the container so the documented port mapping
+# (-p 8080:8080) actually reaches the page: container-loopback is not
+# reachable from the host. Exposure is governed by the -p mapping and
+# your reverse proxy (docs/custom-domain.md), not by this default.
+ENV OUTPAGE_DB=/data/outpage.db OUTPAGE_HTTP=0.0.0.0:8080
 EXPOSE 8080
 ENTRYPOINT ["/outpage"]
 CMD ["serve"]

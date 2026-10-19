@@ -54,8 +54,29 @@ documented deploy path.
 
 From a clean tree, measured: `go build` (release flags) → seed a
 component → `serve` → first public page served: **15 s**. 2-minute class
-achieved; the 15-minute hard cap is untouched. `docker run` is
-CI-gated (docker build step in the workflow).
+achieved; the 15-minute hard cap is untouched.
+
+## Docker gate (locally verified post-install)
+
+Docker was installed on the workstation specifically to run the last
+CI-gated check locally. The gate immediately caught a real bug:
+
+- **Container-bound page unreachable from the host (P1).** The
+  Dockerfile's `ENV OUTPAGE_HTTP=127.0.0.1:8080` bound loopback *inside*
+  the container, so the documented `-p 8080:8080` mapping could never
+  reach the page — `docker run` booted, logs looked healthy, and every
+  curl from the host failed. Fix: the container default binds
+  `0.0.0.0:8080` (exposure is governed by the `-p` mapping and the
+  operator's reverse proxy, per docs/custom-domain.md — the same lesson
+  warmline's Dockerfile encodes).
+
+Verified against the real image, and now standing in `scripts/e2e.sh`
+(runs wherever docker exists; CI keeps its own build step): build from
+the clean tree → `docker run -p … -v outpage-e2e-data:/data` → page
+serves `All systems operational` with the ETH footer → `/donate` carries
+the BTC address → `/admin` 404s → `docker exec` seeds a component →
+`docker restart` → the component still renders (SQLite persists on the
+mounted volume across container lifecycles).
 
 ## Noted, not fixed (post-v0.1 backlog, none block the gate)
 
@@ -67,4 +88,4 @@ CI-gated (docker build step in the workflow).
 
 **Verdict: v0.1 release gate PASS.** All three surfaces agree on
 fixtures, `wails build` compiles, addresses identical everywhere, cold
-start 15 s, no scope violations.
+start 15 s, container gate locally verified, no scope violations.

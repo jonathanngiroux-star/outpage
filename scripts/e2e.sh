@@ -77,5 +77,29 @@ echo "== TUI non-TTY never hangs =="
 timeout 5 "$BIN" tui --db "$DB" | grep -q "interactive terminal UI"
 echo "   non-TTY hint: OK"
 
+echo "== docker build + run (when docker exists) =="
+if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+  docker build -t outpage-e2e . >/dev/null
+  DPORT=18888
+  docker rm -f outpage-e2e-run >/dev/null 2>&1 || true
+  docker volume rm outpage-e2e-data >/dev/null 2>&1 || true
+  docker run -d --name outpage-e2e-run -p "$DPORT:8080" -v outpage-e2e-data:/data outpage-e2e >/dev/null
+  for i in $(seq 1 15); do curl -sf "http://127.0.0.1:$DPORT/" >/dev/null && break; sleep 1; done
+  DPAGE=$(curl -sf "http://127.0.0.1:$DPORT/")
+  echo "$DPAGE" | grep -q "All systems operational"
+  echo "$DPAGE" | grep -q "0x85ee7E71f762d772599cbF1EC20E651B30657521"
+  curl -sf "http://127.0.0.1:$DPORT/donate" | grep -q "bc1qxe2zx5tv3hdreaej6s2x4p7han85uey828rrhg"
+  test "$(curl -sf -o /dev/null -w "%{http_code}" "http://127.0.0.1:$DPORT/admin")" = "404"
+  docker exec outpage-e2e-run /outpage component add --db /data/outpage.db --name "API" >/dev/null
+  docker restart outpage-e2e-run >/dev/null
+  sleep 2
+  curl -sf "http://127.0.0.1:$DPORT/" | grep -q "API"
+  docker rm -f outpage-e2e-run >/dev/null
+  docker volume rm outpage-e2e-data >/dev/null
+  echo "   container: page + donate + 404 + volume persistence across restart: OK"
+else
+  echo "   docker not available here — container gate runs in CI (docker build step)"
+fi
+
 echo
 echo "E2E PASS — v0.1 release gate green."
